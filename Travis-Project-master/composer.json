@@ -1,0 +1,129 @@
+{
+  "name": "ktomk/pipelines",
+  "description": "bitbucket pipelines runner",
+  "homepage": "https://ktomk.github.io/pipelines/",
+  "minimum-stability": "stable",
+  "license": "AGPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Tom Klingenberg",
+      "email": "ktomk@github.com"
+    }
+  ],
+  "support": {
+    "issues": "https://github.com/ktomk/pipelines/issues",
+    "source": "https://github.com/ktomk/pipelines"
+  },
+  "bin": ["bin/pipelines"],
+  "autoload": {
+    "psr-4": {"Ktomk\\Pipelines\\": "src/"}
+  },
+  "autoload-dev": {
+    "classmap": ["test/TestCase.php"],
+    "psr-4": {
+      "Ktomk\\Pipelines\\Integration\\": "test/integration",
+      "Ktomk\\Pipelines\\": "test/unit"
+    },
+    "files": [
+      "test/phpunit_class_aliases.php"
+    , "test/phpunit_exit_report_fatals.php"
+    ]
+  },
+  "require": {
+    "php": "^5.3.3 || ^7.0 || ^8.0",
+    "ext-json": "*",
+    "justinrainbow/json-schema": "^5.2",
+    "ktomk/symfony-yaml": "~2.6.13"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "~3.2.1",
+    "kubawerlos/php-cs-fixer-custom-fixers": "~3.2.1",
+    "phpunit/phpunit": "^4 || ^5 || ^6.5 || ^7.0 || ^8.0 || ^9.0",
+    "roave/security-advisories": "dev-latest"
+  },
+  "suggest": {
+    "ext-yaml": "Preferred YAML parser; highly recommended."
+  },
+  "scripts": {
+    "build": "@php -d phar.readonly=0 -f lib/build/build.php # build phar file",
+    "cs-check": "@php -f vendor/bin/php-cs-fixer -- fix --dry-run",
+    "cs-fix": "@php -f vendor/bin/php-cs-fixer -- fix",
+    "dev": [
+      "lib/script/tmp-test.sh",
+      "@cs-fix",
+      "@unit-test",
+      "lib/script/tmp-test.sh"
+    ],
+    "mkdocs": "@php -f bin/pipelines -- --verbatim --pipeline custom/html-docs",
+    "pre-install-cmd": [
+      "test/data/package/make-test-stub-package.sh"
+    ],
+    "reset": "git checkout -- composer.json composer.lock && rm -r vendor/ && composer -q install -n --no-progress",
+    "test": [
+      "@composer validate --strict",
+      "@phpunit-test",
+      "@php -f bin/pipelines -- --verbatim --pipeline custom/unit-tests-php-5.3",
+      "@shell-test"
+    ],
+    "shell-test": [
+      "test/shell/run.sh"
+    ],
+    "unit-test": [
+      "@phpunit --log-junit build/log/junit.xml --coverage-clover build/log/clover.xml test/unit",
+      "@php -f lib/build/coverage-checker.php -- build/log/clover.xml"
+    ],
+    "integration-test": [
+      "@phpunit test/integration"
+    ],
+    "phpunit": [
+      "XDEBUG_MODE=coverage \"$PHP_BINARY\" -d phar.readonly=0 -d error_reporting=-1 -d error_log= -d log_errors=1 -d display_errors=0 -f vendor/phpunit/phpunit/phpunit -- -v"
+    ],
+    "phpunit-test": [
+      "@phpunit --log-junit build/log/junit.xml --coverage-clover build/log/clover.xml test",
+      "@php -f lib/build/coverage-checker.php -- build/log/clover.xml"
+    ],
+    "ppconf": [
+      "lib/script/ppconf.sh"
+    ],
+    "which": [
+      "Ktomk\\Pipelines\\Composer::which"
+    ],
+    "which-php": [
+      "Ktomk\\Pipelines\\Composer::whichPhp"
+    ],
+    "ci": [
+      "lib/script/tmp-test.sh",
+      "@composer validate --strict",
+      "test/shell/run.sh test-smoke.sh",
+      "@cs-check",
+      "@php -f bin/pipelines -- --verbatim --pipeline custom/lint-php",
+      "@build",
+      "@test",
+      "@mkdocs",
+      "lib/script/tmp-test.sh"
+    ]
+  },
+  "scripts-descriptions": {
+    "build": "Build phar file",
+    "ci": "Run CI build",
+    "cs-check": "Validate code-style",
+    "cs-fix": "Fix code-style",
+    "dev": "Run cs-fix and unit-test",
+    "integration-test": "Run integration-tests",
+    "mkdocs": "Make HTML documentation",
+    "reset": "Reset composer dependencies to GIT SCM HEAD",
+    "test": "Run all tests",
+    "phpunit": "Phpunit script stub",
+    "phpunit-test": "Run all phpunit tests",
+    "shell-test": "Run shell tests",
+    "unit-test": "Run unit-tests",
+    "ppconf": "PHP Project configuration script",
+    "which": "Locate composer command",
+    "which-php": "Locate php command"
+  },
+  "config": {
+    "autoloader-suffix": "pipelines",
+    "platform-check": false,
+    "sort-packages": true
+  }
+}

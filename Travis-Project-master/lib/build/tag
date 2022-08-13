@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# tag and publish the release
+#
+# usage: ./lib/build/tag
+#
+set -euo pipefail
+IFS=$'\n\t'
+
+# check that changelog file is tracked
+>/dev/null git ls-files --error-unmatch CHANGELOG.md
+
+# ## [0.0.13] - 2018-03-20
+
+CHANGELOG="$(
+  grep -m 1 -e '^## \[' CHANGELOG.md \
+  | sed -n -e 's/^## \[\([0-9.]*\)\].*$/\1/p'
+)"
+
+# process --go flag
+GO=false
+if [[ "--go" = "${1-}" ]]; then
+  GO=true
+  shift
+fi
+
+TAG="${1-${CHANGELOG}}"
+
+echo "tag and publish: ${TAG}"
+echo "  branch: $(git rev-parse --abbrev-ref HEAD)"
+echo "  commit: $(git log --oneline -1)"
+
+# check not unreleased (not digits and dots, no semver checker here)
+if [[ "${TAG}" = "" ]]; then
+  if ! grep '^## \[unreleased\]' CHANGELOG.md; then
+    >&2 echo "fatal: not a version tag '${TAG}' and not unreleased"
+    exit 1
+  fi
+
+  NEXT_TAG="$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=1; print $0}')"
+  sed -i -e 's/^## \[unreleased\].*$/## ['"$NEXT_TAG"'] - '"$(date --utc +%F)"'/' CHANGELOG.md
+  git add CHANGELOG.md
+  git commit -m "prepare $NEXT_TAG release"
+  # git tag is auto-created later
+  >&2 echo "info: prepared for tag '${NEXT_TAG}' now, prepare commit added"
+  TAG="$NEXT_TAG"
+fi
+
+# check it is linked (links are at the bottom of the CHANGELOG.md)
+# [0.0.35]: https://github.com/ktomk/pipelines/releases/tag/0.0.35
+if ! grep -qP '^\Q['"${TAG}"']\E: https://' CHANGELOG.md; then
+  >&2 echo "bumpers: no link for version tag '${TAG}', adding it to last commit"
+  >&2 echo "       [${TAG}]: https://github.com/ktomk/pipelines/releases/tag/${TAG}"
+  sed -i -e '$i'"[${TAG}]: https://github.com/ktomk/pipelines/releases/tag/${TAG}" CHANGELOG.md
+  git add CHANGELOG.md
+  git commit --amend -C HEAD
+  >&2 echo "info: added link for tag '${TAG}' to CHANGELOG.md and committed"
+fi
+
+# check that changelog file is not changed (committed)
+if ! git diff --exit-code CHANGELOG.md; then
+  >&2 echo "fatal: CHANGELOG.md has uncommitted changes"
+  exit 1
+fi
+
+# check that help section in read-me is up to date (and read-me committed)
+php -f lib/build/usage.php
+if ! git diff --exit-code README.md; then
+  >&2 echo "fatal: README.md has uncommitted changes"
+  exit 1
+fi
+
+# no push by default
+if [[ "${GO}" != "true" ]]; then
+  echo "would tag & push now, but no --go, exiting."
+  exit
+fi
+
+# run-of-the-mill
+
+git tag -a "${TAG}" -m "${TAG}"
+
+echo "pushing tag ${TAG}"
+git push origin "${TAG}"
+
+git checkout master && git merge --ff-only "${TAG}"
+
+echo "pushing master"
+git push origin master:master
+
+git checkout -

@@ -1,0 +1,16 @@
+# this file is part of pipelines
+
+clone:
+  depth: 1
+  lfs: true
+  enabled: true
+
+image: ktomk/pipelines:busybox
+
+pipelines:
+  default:
+    - step:
+        clone:
+          enabled: false
+        script:
+          - ':'

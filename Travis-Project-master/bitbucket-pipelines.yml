@@ -1,0 +1,384 @@
+clone:
+  depth: 1
+
+pipelines:
+  default:
+    - step:
+        image: ktomk/pipelines@sha256:2ef9a59041a7c4f36001abaec4fe7c10c26c1ead4da11515ba2af346fe60ddac
+        name: pipeline features and introspection
+        script:
+          - echo "test" || true
+          - lib/pipelines/environment.sh
+
+  custom:
+    lint-php-5.3:
+      - step: &lint-php53
+          image: php:5.3
+          script:
+            - lib/script/ppconf.sh downpatch-phpunit-tests
+            - lib/pipelines/lint.sh
+    unit-tests-php-5.3:
+      - step:
+          image: cespi/php-5.3:cli-latest # has no zip: tomsowerby/php-5.3:cli
+          caches:
+            - build-http-cache
+            - composer
+          script:
+            - command -v composer || lib/pipelines/composer-install.sh
+            - lib/script/ppconf.sh self-test disable-tls remove-dev optional downpatch-phpunit-tests
+            - composer -n -q update --no-progress
+            - vendor/bin/phpunit # --testsuite unit,integration by default w/ phpunit 4.8.36
+          services:
+            - docker
+    build-phar-php-5.3:
+      - step:
+          image: docker.io/ktomk/pipelines:php5.3-cespi
+          caches:
+            - composer-53-build-cespi
+          script:
+            - lib/script/ppconf.sh self-test remove-dev optional downpatch-phpunit-tests
+            - composer -n -q update --no-progress
+            - git reset --hard HEAD # reset for phar build
+            - bash -c '( set -o pipefail; composer build 2>&1 | tee build/build-pipelines-phar.log; )'
+          artifacts:
+            - build/build-pipelines-phar.log
+            - build/pipelines.phar
+    unit-tests-php-7.0:
+      - step: &unit-tests-php70
+          image: ktomk/pipelines:php7.0
+          caches:
+            - build-http-cache
+            - composer
+          script:
+            - command -v composer || lib/pipelines/composer-install.sh
+            - lib/script/ppconf.sh self-test remove-dev all downpatch-phpunit-tests phpunit ^6
+            - vendor/bin/phpunit --testsuite unit,integration
+          services:
+            - docker
+    unit-tests-php-7.1:
+      - step:
+          image: ktomk/pipelines:php7.1
+          caches:
+            - build-http-cache
+            - composer
+          script:
+            - command -v composer || lib/pipelines/composer-install.sh
+            - lib/script/ppconf.sh self-test remove-dev all downpatch-phpunit-tests phpunit ^6
+            - vendor/bin/phpunit --testsuite unit,integration
+          services:
+            - docker
+    unit-tests-php-7.2:
+      - step:
+          image: ktomk/pipelines:php7.2
+          caches:
+            - build-http-cache
+            - composer
+          script:
+            - command -v composer || lib/pipelines/composer-install.sh
+            - lib/script/ppconf.sh self-test phpunit ^7
+            - vendor/bin/phpunit --testsuite unit,integration
+          services:
+            - docker
+    lint-php-7.4:
+      - step: &lint-php74
+          image: php:7.4
+          script:
+            - lib/pipelines/lint.sh
+    unit-tests-php-7.4:
+      - step:
+          image: ktomk/pipelines:php7.4
+          caches:
+            - build-http-cache
+            - composer
+          script:
+            - command -v composer || lib/pipelines/composer-install.sh
+            - lib/script/ppconf.sh self-test phpunit ^7
+            - vendor/bin/phpunit --testsuite unit,integration
+          services:
+            - docker
+    lint-php-8.0:
+      - step: &lint-php80
+          image: php:8.0
+          script:
+            - lib/pipelines/lint.sh
+    unit-tests-php-8.0:
+      - step:
+          image: ktomk/pipelines:php8.0
+          caches:
+            - build-http-cache
+            - composer
+          script:
+            - command -v composer || lib/pipelines/composer-install.sh
+            - composer -n require --no-progress --dev phpunit/phpunit ^9 --update-with-dependencies --ignore-platform-reqs
+            - ./lib/script/ppconf.sh patch-phpunit-tests
+            - vendor/bin/phpunit --migrate-configuration
+            - vendor/bin/phpunit --testsuite unit,integration
+          services:
+            - docker
+    lint-php-8.0-alpine:
+      - step: &lint-php80-alpine
+          image: ktomk/pipelines:php8.0-alpine
+          caches: [apk]
+          script:
+            - lib/pipelines/lint.sh
+    unit-tests-php-8.0-alpine:
+      - step:
+          image: ktomk/pipelines:php8.0-alpine
+          caches:
+            - composer
+          script:
+            - composer -n require --no-progress --dev phpunit/phpunit ^9 --update-with-dependencies --ignore-platform-reqs
+            - ./lib/script/ppconf.sh patch-phpunit-tests
+            - vendor/bin/phpunit --migrate-configuration
+            - XDEBUG_MODE=coverage vendor/bin/phpunit --testsuite unit,integration
+          services:
+            - docker
+    ci-php-8.0-alpine:
+      - step:
+          image: ktomk/pipelines:php8.0-alpine
+          caches: [composer, vendor-php80]
+          script:
+            - composer -n install --no-progress
+            - composer ci
+          services: [docker]
+    lint-php-8.1-alpine:
+      - step: &lint-php81-alpine
+          image: ktomk/pipelines:php8.1-alpine
+          caches: [apk]
+          script:
+            - lib/pipelines/lint.sh
+    unit-tests-php-8.1-alpine:
+      - step:
+          image: ktomk/pipelines:php8.1-alpine
+          caches:
+            - composer
+          script:
+            - composer -n require --no-progress --dev phpunit/phpunit ^9 --update-with-dependencies --ignore-platform-reqs
+            - ./lib/script/ppconf.sh patch-phpunit-tests
+            - vendor/bin/phpunit --migrate-configuration
+            - XDEBUG_MODE=coverage vendor/bin/phpunit --testsuite unit,integration
+          services:
+            - docker
+    ci-php-8.1-alpine:
+      - step:
+          image: ktomk/pipelines:php8.1-alpine
+          caches: [composer, vendor-php81]
+          script:
+            - composer -n install --no-progress || composer -n update --no-progress
+            - PHP_CS_FIXER_IGNORE_ENV=1 composer ci
+          services: [docker]
+    lint-php:
+      - step: *lint-php53
+      - step: *lint-php74
+      - step: *lint-php80
+      - step: *lint-php80-alpine
+      - step: *lint-php81-alpine
+    unit-tests: # run phpunit suite
+      - step: *unit-tests-php70
+    html-docs:
+      - step:
+          name: build html-docs with mkdocs
+          image: ktomk/pipelines:mkdocs-material
+          artifacts: [build/html-docs/**, build/html-docs.tar.gz]
+          caches: [composer, pip]
+          script:
+            - make -C lib/build/mkdocs clean ../../../build/html-docs.tar.gz
+    artifact-tests: # run phpunit suite w/ artifact
+      - step:
+          image: php:7.0
+          script:
+            - vendor/bin/phpunit
+          artifacts:
+            - build/html/testdox.html
+    docker:
+      - step:
+          image: ktomk/pipelines:busybox
+          name: docker-in-docker
+          script:
+            - 'docker version --format "client: {{.Client.Version}} / server: {{.Server.Version}}"'
+            - docker ps
+            - docker inspect pipelines-1.docker-in-docker.custom-docker.pipelines | head -n 8
+          services:
+            - docker
+    docker-install:
+      - step:
+          image: php:7.0
+          name: docker-in-docker w/ install script
+          caches:
+            - build-http-cache
+          script:
+            - lib/pipelines/docker-client-install.sh
+            - docker version
+            - docker version --format {{.Client.Version}}
+            - docker version --format {{.Server.Version}}
+            - bin/pipelines --deploy mount --keep
+    docker-phar:
+      - step:
+          image: php:7.0
+          name: default pipeline inside pipelines pipeline
+          script:
+            - docker version
+            - 'docker version --format "client: {{.Client.Version}} / server: {{.Server.Version}}"'
+            - build/pipelines.phar --no-keep
+          services:
+            - docker
+    docker-phar-install:
+      - step:
+          image: php:7.0
+          name: default pipeline inside pipelines pipeline (extra docker client install)
+          caches:
+            - build-http-cache
+          script:
+            - lib/pipelines/docker-client-install.sh
+            - docker version
+            - 'docker version --format "client: {{.Client.Version}} / server: {{.Server.Version}}"'
+            - build/pipelines.phar --no-keep
+    recursion:
+      - step:
+          image: php:7.4
+          script:
+            - 'docker version --format "client: {{.Client.Version}} / server: {{.Server.Version}}"'
+            - docker cp --help
+            - bin/pipelines --pipeline custom/recursion/middle
+          services:
+            - docker
+    recursion/middle:
+      - step:
+          image: php:7.4
+          script:
+            - php --version
+      - step:
+          image: php:7.4
+          script:
+            - 'docker version --format "client: {{.Client.Version}} / server: {{.Server.Version}}"'
+            - bin/pipelines --pipeline custom/recursion --dry-run # must fail
+          services:
+            - docker
+    recursion-pip-happy:
+      - step:
+          image: php:7.4
+          script:
+            - 'docker version --format "client: {{.Client.Version}} / server: {{.Server.Version}}"'
+            - docker cp --help
+            - bin/pipelines --pipeline custom/recursion-pip-happy/end
+          services:
+            - docker
+    recursion-pip-happy/end:
+      - step:
+          image: php:7.4
+          script:
+            - ':'
+    private/docker-hub:
+      - step:
+          image:
+            name: ktomk/private:busybox
+            username: $DOCKER_ID_USER
+            password: $DOCKER_ID_PASSWORD
+            email: $DOCKER_ID_EMAIL
+          script:
+            - lib/pipelines/environment.sh
+            - env
+    printenv:
+      - step:
+          image: ktomk/pipelines:busybox
+          name: print environment variables
+          script:
+            - printenv | sort
+    after-script:
+      - step:
+          image: ktomk/pipelines:busybox
+          name: Happy
+          script:
+            - echo "fine"
+          after-script:
+            - 'echo "BITBUCKET_EXIT_CODE: ${BITBUCKET_EXIT_CODE}"'
+      - step:
+          name: Broken
+          image: ktomk/pipelines:busybox
+          script:
+            - exit 123
+            - echo "already broken"
+          after-script:
+            - 'echo "BITBUCKET_EXIT_CODE: ${BITBUCKET_EXIT_CODE}"'
+    redis-service:
+      - step:
+          name: redis service
+          image: redis:alpine
+          script:
+            - redis-cli -h localhost ping
+          services:
+            - redis
+    mysql-service:
+      - step:
+          name: mysql service
+          image: mysql:5.7
+          script:
+            - mysql --version
+            - T=10; while [ $T -gt 0 ]; do echo $T; T=$(( $T - 1 )); sleep 1; done # give mysql a bit of time to boot up
+            - >
+              mysql -h 127.0.0.1 -u test_user -ptest_user_password -D pipelines -vvv -e '
+                SHOW DATABASES;
+                SELECT VERSION();
+                SHOW VARIABLES LIKE "%version%";
+              '
+          services:
+            - mysql
+    deploy: # https://bitbucket.org/blog/adding-human-interaction-back-into-automated-builds
+      - variables:
+          - name: ENVIRONMENT
+      - step:
+          image: ktomk/pipelines:busybox
+          script:
+            - echo "Deploying to $ENVIRONMENT"
+              # ... rest of deployment script
+    exit-status:
+      - step:
+          name: "override set -e"
+          image: ktomk/pipelines:busybox
+          script:
+            - if [ $BITBUCKET_STEP_RUN_NUMBER -gt 1 ]; then exit; fi  # skip on second run after failure"
+            - set +e
+            - mkdir -p /dev/null
+            - echo "surrender"
+      - step:
+          name: "shell pipe && (and ||) behaviour (set -e is implicit in pipelines)"
+          image: ktomk/pipelines:busybox
+          script:
+            - if [ $BITBUCKET_STEP_RUN_NUMBER -gt 1 ]; then exit; fi  # skip on second run after failure"
+            - mkdir -p /dev/null && true
+            - echo "surrender"
+      - step:
+          name: "script scope example (per each script command, not shell command)"
+          image: ktomk/pipelines:busybox
+          script:
+            - |
+              mkdir -p /dev/null && test
+              echo "despite mkdir non-zero exit status ($?), this script part will be fine"
+            - echo "ok."
+    bash-runner:
+      - step:
+          name: "bash runner"
+          image: ktomk/pipelines:ubuntu-bash
+          script:
+            - echo "$HELLO"
+            - source /etc/os-release
+            - echo "$PRETTY_NAME"
+
+definitions:
+  caches:
+    apk: /etc/apk/cache
+    build-http-cache: ~/.cache/build-http-cache
+    composer-53-build-cespi: ~/.composer/cache
+    vendor-php80: vendor
+    vendor-php81: vendor
+  services:
+    redis:
+      image: redis:6.0.4-alpine
+      memory: 512 # memory limits are ignored locally
+    mysql:
+      image: mysql:5.7
+      variables:
+        MYSQL_DATABASE: pipelines
+        MYSQL_RANDOM_ROOT_PASSWORD: 1
+        MYSQL_USER: $MYSQL_USER
+        MYSQL_PASSWORD: $MYSQL_PASSWORD

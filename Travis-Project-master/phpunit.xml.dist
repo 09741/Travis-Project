@@ -1,0 +1,34 @@
+<phpunit
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/6.3/phpunit.xsd"
+        bootstrap="vendor/autoload.php"
+        cacheTokens="false"
+        defaultTestSuite="unit"
+        cacheResultFile="build/cache/.phpunit.result.cache"
+        >
+    <php>
+        <ini name="error_reporting" value="-1" />
+        <ini name="display_errors" value="0" />
+        <ini name="log_errors" value="1" />
+        <ini name="error_log" value="" />
+    </php>
+    <testsuites>
+        <testsuite name="unit">
+            <directory>test/unit</directory>
+            <directory suffix=".phpt" phpVersion="5.4.0" phpVersionOperator=">=">test/unit/PharBuild/phpt</directory>
+            <directory suffix=".phpt" phpVersion="5.4.0" phpVersionOperator=">=">test/unit/phpt</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory>test/integration</directory>
+        </testsuite>
+    </testsuites>
+    <filter>
+        <whitelist processUncoveredFilesFromWhitelist="true">
+            <directory suffix=".php">src</directory>
+        </whitelist>
+    </filter>
+    <logging>
+        <log type="coverage-html" target="build/html" lowUpperBound="70" highLowerBound="100"/>
+        <log type="testdox-html" target="build/html/testdox.html"/>
+    </logging>
+</phpunit>
